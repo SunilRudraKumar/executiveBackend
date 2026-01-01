@@ -1,0 +1,22 @@
+# Render deployment configuration
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: executiveinn-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST_URL
+        sync: false  # Set manually in Render dashboard
+      - key: APP_ID
+        sync: false
+      - key: API_PASSWORD
+        sync: false
+      - key: STATS_APP_ID
+        sync: false
+      - key: STATS_API_PASSWORD
+        sync: false
