@@ -136,18 +136,60 @@ const ALL_KNOWN_FIELDS = [
  */
 const categorizeEvent = (event, result) => {
     const eventType = event.event_type || event.type || '';
-    const payload = event.payload || event;
 
     // Common fields to extract
     const baseEvent = {
-        id: event.id || event.event_id,
+        id: event.event_id || event.id,
         timestamp: event.timestamp || event.created_at || new Date().toISOString(),
         eventType: eventType,
-        propertyId: payload.property_id || payload.propertyId,
-        propertyName: payload.property_name || payload.propertyName
+        propertyId: event.property_id,
+        propertyCode: event.property_code,
+        streamId: event.stream_id,
+        streamName: event.stream_name,
+        timezone: event.timezone
     };
 
-    // Check if this is a stats snapshot event (contains multiple metrics)
+    // Check if this event has a 'statistics' object (HotelKey stats format)
+    if (event.statistics && typeof event.statistics === 'object') {
+        const stats = event.statistics;
+
+        const statsEvent = {
+            ...baseEvent,
+            category: 'STATS_SNAPSHOT',
+            type: event.type,
+            metrics: {}
+        };
+
+        // Extract all metrics from the statistics object
+        Object.keys(stats).forEach(key => {
+            if (ALL_KNOWN_FIELDS.includes(key)) {
+                statsEvent.metrics[key] = stats[key];
+            }
+        });
+
+        // If no known fields matched, just copy all stats
+        if (Object.keys(statsEvent.metrics).length === 0) {
+            statsEvent.metrics = { ...stats };
+        }
+
+        // Include change_events if present
+        if (event.change_events) {
+            statsEvent.changeEvents = event.change_events;
+        }
+
+        statsEvent.rawPayload = event;
+        result.stats.push(statsEvent);
+
+        // Log a summary
+        const metricsCount = Object.keys(statsEvent.metrics).length;
+        console.log(`Stats Snapshot captured: ${metricsCount} metrics from ${event.type || 'unknown'} type`);
+        console.log('Sample metrics:', JSON.stringify(Object.keys(statsEvent.metrics).slice(0, 10)));
+
+        return;
+    }
+
+    // Legacy check for flat payload structure
+    const payload = event.payload || event;
     const payloadKeys = Object.keys(payload);
     const matchedFields = payloadKeys.filter(key => ALL_KNOWN_FIELDS.includes(key));
 
@@ -159,36 +201,7 @@ const categorizeEvent = (event, result) => {
             metrics: {}
         };
 
-        // Guest/Reservation metrics
-        GUEST_RESERVATION_FIELDS.forEach(field => {
-            if (payload[field] !== undefined) {
-                statsEvent.metrics[field] = payload[field];
-            }
-        });
-
-        // Arrival/Departure metrics
-        ARRIVAL_DEPARTURE_FIELDS.forEach(field => {
-            if (payload[field] !== undefined) {
-                statsEvent.metrics[field] = payload[field];
-            }
-        });
-
-        // Room status metrics
-        ROOM_STATUS_FIELDS.forEach(field => {
-            if (payload[field] !== undefined) {
-                statsEvent.metrics[field] = payload[field];
-            }
-        });
-
-        // Revenue metrics
-        REVENUE_FIELDS.forEach(field => {
-            if (payload[field] !== undefined) {
-                statsEvent.metrics[field] = payload[field];
-            }
-        });
-
-        // Occupancy metrics
-        OCCUPANCY_FIELDS.forEach(field => {
+        ALL_KNOWN_FIELDS.forEach(field => {
             if (payload[field] !== undefined) {
                 statsEvent.metrics[field] = payload[field];
             }
@@ -197,10 +210,7 @@ const categorizeEvent = (event, result) => {
         statsEvent.rawPayload = payload;
         result.stats.push(statsEvent);
 
-        // Log a summary
         console.log(`Stats Snapshot: ${matchedFields.length} metrics captured`);
-        console.log('Metrics:', JSON.stringify(statsEvent.metrics, null, 2));
-
         return;
     }
 
@@ -239,10 +249,10 @@ const categorizeEvent = (event, result) => {
     }
 
     // Unknown type, store in raw but log it for debugging
-    console.log('Unknown event type:', eventType, 'Keys:', Object.keys(payload).slice(0, 10));
+    console.log('Unknown event type:', eventType, 'Keys:', Object.keys(event).slice(0, 10));
     result.raw.push({
         ...baseEvent,
-        rawPayload: payload
+        rawPayload: event
     });
 };
 
