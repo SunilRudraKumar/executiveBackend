@@ -22,3 +22,6 @@ Thumbs.db
 # Build
 dist/
 build/
+
+# Data storage (persistent JSON files)
+data/

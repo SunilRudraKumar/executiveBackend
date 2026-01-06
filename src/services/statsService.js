@@ -1,9 +1,10 @@
 const axios = require('axios');
 const config = require('../config/config');
+const { loadData, saveData, FILES } = require('../utils/storage');
 
-// In-memory stores
-let statsStore = [];
-let balancesStore = [];
+// Load existing data from files on startup
+let statsStore = loadData(FILES.STATS, []);
+let balancesStore = loadData(FILES.BALANCES, []);
 
 const getStatsAuthHeader = () => {
     const credentials = `${config.statsAppId}:${config.statsApiPassword}`;
@@ -81,8 +82,16 @@ const parseStatsEvents = (events) => {
     balancesStore.push(...result.balances);
 
     // Keep stores manageable
-    if (statsStore.length > 100) statsStore = statsStore.slice(-100);
-    if (balancesStore.length > 100) balancesStore = balancesStore.slice(-100);
+    if (statsStore.length > 500) statsStore = statsStore.slice(-500);
+    if (balancesStore.length > 500) balancesStore = balancesStore.slice(-500);
+
+    // Persist to files
+    if (result.stats.length > 0) {
+        saveData(FILES.STATS, statsStore);
+    }
+    if (result.balances.length > 0) {
+        saveData(FILES.BALANCES, balancesStore);
+    }
 
     return result;
 };

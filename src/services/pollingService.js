@@ -1,8 +1,10 @@
 const axios = require('axios');
 const config = require('../config/config');
 const { parseEvents } = require('../utils/dataParser');
+const { loadData, appendData, FILES } = require('../utils/storage');
 
-let dataStore = []; // In-memory store for demo purposes
+// Load existing data from file on startup
+let dataStore = loadData(FILES.EVENTS, []);
 
 const getAuthHeader = () => {
     const credentials = `${config.appId}:${config.apiPassword}`;
@@ -32,6 +34,9 @@ const pollData = async () => {
             dataStore.push(...cleanData);
             // Limit store size
             if (dataStore.length > 100) dataStore = dataStore.slice(-100);
+
+            // Persist to file
+            appendData(FILES.EVENTS, cleanData, 500);
 
             return cleanData;
         } else {
